@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,7 +6,7 @@ from src.api.deps import get_file_service
 from src.core.db import get_session
 from src.schemas.files import FileItem, FileUpdate
 from src.services.files import FileService
-from src.tasks import scan_file_for_threats
+from src.worker.tasks import process_file
 
 router = APIRouter(tags=["files"])
 
@@ -22,20 +22,18 @@ async def list_files(
 
 @router.post("/files", response_model=FileItem, status_code=201)
 async def create_file(
+    background: BackgroundTasks,
     title: str = Form(...),
     file: UploadFile = File(...),
     service: FileService = Depends(get_file_service),
     session: AsyncSession = Depends(get_session),
 ):
     item = await service.create(title=title, upload_file=file)
-    # get_session() commits only after the response has already been sent
-    # (FastAPI runs yield-dependency cleanup post-response), but the worker
-    # can pick up the queued task faster than that and find no row. Commit
-    # explicitly here so the row is durable and visible before the task is
-    # enqueued. Task 9 moves dispatch to BackgroundTasks, which runs after
-    # dependency cleanup, so this explicit commit becomes unnecessary then.
+    # Коммит обязателен здесь, а не в фазе очистки get_session: без него
+    # server_default-поля (created_at, updated_at, requires_attention) не
+    # заполнены на момент сериализации ответа, и воркер не увидит строку.
     await session.commit()
-    scan_file_for_threats.delay(item.id)
+    background.add_task(process_file.delay, item.id)
     return item
 
 

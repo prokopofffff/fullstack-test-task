@@ -17,15 +17,32 @@ services:
 
   backend-worker:
     build: ./backend
-    command: [ 'celery', '-A', 'src.tasks.celery_app', 'worker', '-l', 'info' ]
+    command: [ 'celery', '-A', 'src.worker.celery_app.celery_app', 'worker', '-l', 'info', '--uid', 'nobody' ]
     container_name: backend-worker
     env_file: ".env"
+    # --uid nobody drops root, but HOME still points at /root (mode 700), which
+    # nobody can't even traverse. asyncpg's connect path stats $HOME/.postgresql/*
+    # while negotiating SSL and dies with PermissionError before a query is ever
+    # sent. Point HOME at a directory nobody can read so the connection succeeds.
+    environment:
+      HOME: /tmp
     volumes:
       - ./backend:/backend
       - backend-storage:/backend/storage
     depends_on:
       backend-db:
         condition: service_healthy
+      backend-redis:
+        condition: service_healthy
+
+  backend-beat:
+    build: ./backend
+    command: [ 'celery', '-A', 'src.worker.celery_app.celery_app', 'beat', '-l', 'info' ]
+    container_name: backend-beat
+    env_file: ".env"
+    volumes:
+      - ./backend:/backend
+    depends_on:
       backend-redis:
         condition: service_healthy
 

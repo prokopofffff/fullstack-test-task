@@ -12,6 +12,9 @@ wheels/
 **/.DS_Store
 backend/storage/*
 
+# Celery beat
+celerybeat-schedule*
+
 # Environment variables (never commit secrets; keep the template tracked)
 .env
 .env.local
