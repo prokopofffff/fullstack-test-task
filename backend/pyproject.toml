@@ -14,3 +14,14 @@ dependencies = [
     "sqlalchemy>=2.0.48",
     "uvicorn>=0.42.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "httpx>=0.28.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
