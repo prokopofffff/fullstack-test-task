@@ -30,8 +30,10 @@ async def create_file(
     item = await service.create(title=title, upload_file=file)
     # get_session() commits only after the response has already been sent
     # (FastAPI runs yield-dependency cleanup post-response), but the worker
-    # can pick up the queued task faster than that. Commit explicitly here so
-    # the row is durable and visible before the task is enqueued.
+    # can pick up the queued task faster than that and find no row. Commit
+    # explicitly here so the row is durable and visible before the task is
+    # enqueued. Task 9 moves dispatch to BackgroundTasks, which runs after
+    # dependency cleanup, so this explicit commit becomes unnecessary then.
     await session.commit()
     scan_file_for_threats.delay(item.id)
     return item
