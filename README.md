@@ -10,9 +10,31 @@
 2. (Дополнительно) На бэкенде есть возможность неочевидной оптимизации - выполните ее;
 3. (Дополнительно) Разбейте логику фронтенда на слои;
 
+## Переменные окружения
+
+`.env` в репозиторий не коммитится. Скопируйте шаблон и при необходимости поправьте:
+
+```bash
+cp .env.example .env
+```
+
+| Переменная | Обязательна | По умолчанию | Назначение |
+|---|---|---|---|
+| `POSTGRES_USER` | да | — | пользователь БД |
+| `POSTGRES_PASSWORD` | да | — | пароль БД |
+| `POSTGRES_DB` | да | — | имя базы |
+| `POSTGRES_HOST` | да | — | хост БД (имя сервиса в compose) |
+| `PGPORT` | нет | `5433` | порт Postgres |
+| `CELERY_BROKER_URL` | да | — | брокер Celery; result backend отключён намеренно |
+| `STORAGE_DIR` | нет | `/backend/storage/files` | каталог хранения файлов |
+| `MAX_UPLOAD_SIZE` | нет | `1073741824` | жёсткий лимит загрузки, байт |
+| `CORS_ORIGINS` | нет | `http://localhost:3000` | список origin через запятую |
+| `NEXT_PUBLIC_API_URL` | да | — | адрес API; вшивается **на этапе сборки** фронтенда |
+
 **Запуск:**
-1. ```docker compose -f docker-compose.dev.yml up```
-2. ```docker exec -it backend alembic upgrade head```
+1. ```cp .env.example .env```
+2. ```docker compose -f docker-compose.dev.yml up```
+3. ```docker exec -it backend alembic upgrade head```
 
 
 **Открыть фронт:** ```http://localhost:3000/test``` 

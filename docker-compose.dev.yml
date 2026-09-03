@@ -5,42 +5,63 @@ services:
     container_name: backend
     volumes:
       - ./backend:/backend
-    env_file: ".env.dev"
+      - backend-storage:/backend/storage
+    env_file: ".env"
     ports:
       - "8000:8000"
     depends_on:
-      - backend-db
+      backend-db:
+        condition: service_healthy
+      backend-redis:
+        condition: service_healthy
 
   backend-worker:
     build: ./backend
     command: [ 'celery', '-A', 'src.tasks.celery_app', 'worker', '-l', 'info' ]
     container_name: backend-worker
-    env_file: ".env.dev"
+    env_file: ".env"
     volumes:
       - ./backend:/backend
+      - backend-storage:/backend/storage
     depends_on:
-      - backend-db
+      backend-db:
+        condition: service_healthy
+      backend-redis:
+        condition: service_healthy
 
   backend-db:
-    image: postgres:latest
+    image: postgres:18
     container_name: backend-db
-    ports:
-      - "5433:5433"
-    env_file: ".env.dev"
+    env_file: ".env"
     volumes:
       - backend-db-volume:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -p $${PGPORT}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   backend-redis:
-    image: redis:latest
+    image: redis:8
     container_name: backend-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: frontend
     ports:
       - "3000:3000"
+    depends_on:
+      - backend
 
 volumes:
   backend-db-volume:
+  backend-storage:
