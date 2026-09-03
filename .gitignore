@@ -11,3 +11,9 @@ wheels/
 .idea
 **/.DS_Store
 backend/storage/*
+
+# Environment variables (never commit secrets; keep the template tracked)
+.env
+.env.local
+.env.*.local
+!.env.example
