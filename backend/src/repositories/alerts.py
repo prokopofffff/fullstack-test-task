@@ -22,12 +22,6 @@ class AlertRepository:
         return result.scalar_one_or_none() is not None
 
     async def add(self, file_id: str, level: AlertLevel, message: str) -> Alert:
-        # Flush first: without an ORM relationship() between StoredFile and
-        # Alert, SQLAlchemy's unit of work has no dependency edge between the
-        # two mappers and does not order their INSERTs by the FK column, so a
-        # pending StoredFile in the same session can otherwise be flushed
-        # after the Alert that references it, violating the FK constraint.
-        await self._session.flush()
         alert = Alert(file_id=file_id, level=level.value, message=message)
         self._session.add(alert)
         return alert

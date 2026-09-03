@@ -77,7 +77,12 @@ async def test_list_stale_finds_only_old_non_terminal_rows():
 async def test_alert_exists_guards_duplicates():
     item = make_file()
     async with async_session_maker() as session:
-        await FileRepository(session).add(item)
+        files = FileRepository(session)
+        await files.add(item)
+        # Flush the pending file before adding the alert: StoredFile and Alert
+        # have no ORM relationship(), so nothing orders their INSERTs within a
+        # single flush, and inserting the alert first would violate its FK.
+        await files.flush()
         await AlertRepository(session).add(item.id, AlertLevel.INFO, "ok")
         await session.commit()
     async with async_session_maker() as session:
