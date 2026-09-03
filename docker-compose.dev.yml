@@ -17,13 +17,22 @@ services:
 
   backend-worker:
     build: ./backend
-    command: [ 'celery', '-A', 'src.worker.celery_app.celery_app', 'worker', '-l', 'info', '--uid', 'nobody' ]
+    command: [ 'celery', '-A', 'src.worker.celery_app.celery_app', 'worker', '-l', 'info',
+               '--uid', 'nobody', '--concurrency=1' ]
     container_name: backend-worker
     env_file: ".env"
     # --uid nobody drops root, but HOME still points at /root (mode 700), which
     # nobody can't even traverse. asyncpg's connect path stats $HOME/.postgresql/*
     # while negotiating SSL and dies with PermissionError before a query is ever
     # sent. Point HOME at a directory nobody can read so the connection succeeds.
+    #
+    # --concurrency=1: a single worker process is what makes
+    # tests/test_worker_loop.py meaningful — every task is guaranteed to run
+    # sequentially in the same process, so a regression back to the process-wide
+    # pool in src/core/db.py shows up immediately instead of only on a lucky
+    # single-core run. The workload here (one UPDATE plus one INSERT per task)
+    # doesn't need more, and worker_prefetch_multiplier=1 already keeps the
+    # queue from backing up.
     environment:
       HOME: /tmp
     volumes:
