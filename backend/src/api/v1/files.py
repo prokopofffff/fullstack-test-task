@@ -29,9 +29,10 @@ async def create_file(
     session: AsyncSession = Depends(get_session),
 ):
     item = await service.create(title=title, upload_file=file)
-    # Коммит обязателен здесь, а не в фазе очистки get_session: без него
-    # server_default-поля (created_at, updated_at, requires_attention) не
-    # заполнены на момент сериализации ответа, и воркер не увидит строку.
+    # get_session больше не коммитит сам (см. src/core/db.py) — коммит здесь
+    # обязателен: без него ничего не попадёт в БД, а server_default-поля
+    # (created_at, updated_at, requires_attention) не заполнены на момент
+    # сериализации ответа, и воркер не увидит строку.
     await session.commit()
     background.add_task(process_file.delay, item.id)
     return item
@@ -47,8 +48,20 @@ async def update_file(
     file_id: str,
     payload: FileUpdate,
     service: FileService = Depends(get_file_service),
+    session: AsyncSession = Depends(get_session),
 ):
-    return await service.rename(file_id=file_id, title=payload.title)
+    item = await service.rename(file_id=file_id, title=payload.title)
+    # Тот же приём, что и в create_file/delete_file: get_session больше не
+    # коммитит в фазе очистки, поэтому маршрут обязан сделать это сам, до
+    # возврата ответа — иначе следующий быстрый GET может обогнать запись.
+    await session.commit()
+    # updated_at считается на стороне БД (onupdate=func.now()), и после
+    # UPDATE SQLAlchemy помечает это поле как требующее перечитывания даже
+    # при expire_on_commit=False. Без явного refresh сериализация ответа
+    # (она идёт вне async-контекста) падает с MissingGreenlet при попытке
+    # лениво подгрузить значение.
+    await session.refresh(item)
+    return item
 
 
 @router.get("/files/{file_id}/download")
@@ -64,11 +77,7 @@ async def delete_file(
     session: AsyncSession = Depends(get_session),
 ):
     await service.remove(file_id)
-    # Тот же приём, что и в create_file: коммит здесь, а не в фазе очистки
-    # get_session. Тот cleanup-коммит регистрируется в request-уровневом
-    # AsyncExitStack и по факту выполняется ПОСЛЕ отправки ответа клиенту
-    # (см. fastapi/routing.py: request_stack закрывается после
-    # `await response(...)`). На быстром соединении клиент успевает
-    # прислать следующий GET раньше, чем транзакция закоммитится, и видит
-    # ещё не удалённую запись. Явный коммит до return убирает эту гонку.
+    # get_session больше не коммитит сам (см. src/core/db.py) — коммит здесь
+    # обязателен, иначе удаление откатится при закрытии сессии и клиент
+    # получит 204, хотя запись осталась на месте.
     await session.commit()

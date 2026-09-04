@@ -50,6 +50,21 @@ async def test_patch_changes_title_only(client, upload, wait_terminal):
     assert patched["updated_at"] >= patched["created_at"]
 
 
+async def test_patch_is_visible_to_the_very_next_read(client, upload, wait_terminal):
+    """Коммит должен произойти до ответа, а не в фазе очистки зависимости."""
+    item = await upload("До", "racy.txt", b"x\n", "text/plain")
+    await wait_terminal(item["id"])
+    for attempt in range(20):
+        new_title = f"После {attempt}"
+        patched = await client.patch(f"/files/{item['id']}", json={"title": new_title})
+        assert patched.status_code == 200
+        fetched = await client.get(f"/files/{item['id']}")
+        assert fetched.status_code == 200
+        assert fetched.json()["title"] == new_title, (
+            f"попытка {attempt}: GET обогнал коммит PATCH"
+        )
+
+
 async def test_download_returns_original_bytes(client, upload):
     content = b"download me\n"
     item = await upload("Скачать", "dl.txt", content, "text/plain")
