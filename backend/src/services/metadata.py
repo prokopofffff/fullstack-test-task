@@ -4,6 +4,15 @@ from typing import Any, Protocol
 
 PDF_PAGE_MARKER = b"/Type /Page"
 
+# Разделители строк, которые распознаёт str.splitlines() (плюс \r —
+# он не входит в набор ниже, но тоже завершает строку в TextAccumulator).
+_SPLITLINES_SEPARATORS = "\n\v\f\x1c\x1d\x1e\x85  "
+_LINE_SEPARATORS = _SPLITLINES_SEPARATORS + "\r"
+
+
+def _is_separator(char: str) -> bool:
+    return char in _LINE_SEPARATORS
+
 
 class MetadataAccumulator(Protocol):
     def feed(self, chunk: bytes) -> None: ...
@@ -37,27 +46,24 @@ class TextAccumulator(_Base):
         super().__init__(original_name, mime_type)
         self._decoder = codecs.getincrementaldecoder("utf-8")("ignore")
         self._char_count = 0
-        self._line_count = 0
+        self._sep_count = 0
         self._pending_cr = False
         self._trailing_content = False
 
     def _consume(self, text: str) -> None:
-        for char in text:
-            self._char_count += 1
-            if self._pending_cr:
-                self._pending_cr = False
-                if char == "\n":
-                    continue
-            if char == "\r":
-                self._line_count += 1
-                self._pending_cr = True
-                self._trailing_content = False
-                continue
-            if char in "\n\v\f\x1c\x1d\x1e\x85  ":
-                self._line_count += 1
-                self._trailing_content = False
-                continue
-            self._trailing_content = True
+        if not text:
+            return
+        # Считаем разделители С-уровневым str.splitlines() вместо цикла по
+        # символам: для любой строки s число разделителей равно
+        # len((s + "\x00").splitlines()) - 1, т.к. "\x00" не является
+        # разделителем и гарантирует непустой хвост.
+        # этот \n уже учтён как часть \r\n предыдущего чанка
+        starts_with_pending_lf = self._pending_cr and text[0] == "\n"
+        text_for_seps = text[1:] if starts_with_pending_lf else text
+        self._sep_count += len((text_for_seps + "\x00").splitlines()) - 1
+        self._pending_cr = text.endswith("\r")
+        self._trailing_content = not _is_separator(text[-1])
+        self._char_count += len(text)
 
     def feed(self, chunk: bytes) -> None:
         self._consume(self._decoder.decode(chunk))
@@ -65,7 +71,7 @@ class TextAccumulator(_Base):
     def result(self, size: int) -> dict[str, Any]:
         self._consume(self._decoder.decode(b"", final=True))
         data = super().result(size)
-        data["line_count"] = self._line_count + (1 if self._trailing_content else 0)
+        data["line_count"] = self._sep_count + (1 if self._trailing_content else 0)
         data["char_count"] = self._char_count
         return data
 
