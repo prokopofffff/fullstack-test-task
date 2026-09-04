@@ -30,11 +30,13 @@ def compose(*args: str) -> None:
     subprocess.run(["docker", "compose", "-f", str(COMPOSE_FILE), *args], check=True)
 
 
-def _run_in_backend(script: str, *, env: dict[str, str] | None = None) -> None:
+def _run_in_backend(
+    script: str, *, env: dict[str, str] | None = None, container: str = "backend"
+) -> None:
     cmd = ["docker", "exec"]
     for key, value in (env or {}).items():
         cmd += ["-e", f"{key}={value}"]
-    cmd += ["backend", "uv", "run", "python", "-c", script]
+    cmd += [container, "uv", "run", "python", "-c", script]
     subprocess.run(cmd, check=True)
 
 
@@ -132,21 +134,11 @@ async def test_orphan_from_broker_outage_is_reconciled(client, upload, wait_term
     # окружения контейнера — так не нужно пересобирать образ и не остаётся
     # побочных эффектов для остальных тестов (сам backend-worker и beat
     # продолжают жить с settings.stale_after_seconds по умолчанию).
-    subprocess.run(
-        [
-            "docker",
-            "exec",
-            "-e",
-            "STALE_AFTER_SECONDS=0",
-            "backend-worker",
-            "uv",
-            "run",
-            "python",
-            "-c",
-            "from src.worker.reconciler import _reconcile; import asyncio;"
-            " print(asyncio.run(_reconcile()))",
-        ],
-        check=True,
+    _run_in_backend(
+        "from src.worker.reconciler import _reconcile; import asyncio;"
+        " print(asyncio.run(_reconcile()))",
+        env={"STALE_AFTER_SECONDS": "0"},
+        container="backend-worker",
     )
     final = await wait_terminal(orphan["id"], timeout=60)
     assert final["processing_status"] == "processed"
