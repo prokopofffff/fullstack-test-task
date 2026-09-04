@@ -59,17 +59,15 @@ async def test_download_returns_original_bytes(client, upload):
     assert response.headers["content-type"].startswith("text/plain")
 
 
-async def test_delete_of_processed_file_fails_with_fk_violation(client, upload, wait_terminal):
-    # Characterizes current (buggy) behavior: every file that reaches a
-    # terminal status has exactly one alert row referencing it, and there is
-    # no cascade delete on alerts.file_id. Deleting such a file therefore
-    # hits an unhandled IntegrityError and the endpoint returns a bare 500,
-    # leaving the file in place instead of removing it.
+async def test_delete_removes_file(client, upload, wait_terminal):
+    # alerts.file_id now cascades on delete, so removing a file that reached
+    # a terminal status (and therefore has an alert row) succeeds and takes
+    # its alerts with it instead of hitting a foreign key violation.
     item = await upload("Удалить", "del.txt", b"bye\n", "text/plain")
     await wait_terminal(item["id"])
     response = await client.delete(f"/files/{item['id']}")
-    assert response.status_code == 500
-    assert (await client.get(f"/files/{item['id']}")).status_code == 200
+    assert response.status_code == 204
+    assert (await client.get(f"/files/{item['id']}")).status_code == 404
 
 
 async def test_lists_are_sorted_desc_and_shaped(client, upload):

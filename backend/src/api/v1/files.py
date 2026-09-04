@@ -58,5 +58,17 @@ async def download_file(file_id: str, service: FileService = Depends(get_file_se
 
 
 @router.delete("/files/{file_id}", status_code=204)
-async def delete_file(file_id: str, service: FileService = Depends(get_file_service)):
+async def delete_file(
+    file_id: str,
+    service: FileService = Depends(get_file_service),
+    session: AsyncSession = Depends(get_session),
+):
     await service.remove(file_id)
+    # Тот же приём, что и в create_file: коммит здесь, а не в фазе очистки
+    # get_session. Тот cleanup-коммит регистрируется в request-уровневом
+    # AsyncExitStack и по факту выполняется ПОСЛЕ отправки ответа клиенту
+    # (см. fastapi/routing.py: request_stack закрывается после
+    # `await response(...)`). На быстром соединении клиент успевает
+    # прислать следующий GET раньше, чем транзакция закоммитится, и видит
+    # ещё не удалённую запись. Явный коммит до return убирает эту гонку.
+    await session.commit()
