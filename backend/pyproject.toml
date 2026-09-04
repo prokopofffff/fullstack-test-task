@@ -21,9 +21,29 @@ dev = [
     "pytest>=8.4.0",
     "pytest-asyncio>=1.0.0",
     "httpx>=0.28.0",
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+    "celery-types>=0.26.0",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# B008 (function call in default argument) flags FastAPI's Depends()/Query()/File()
+# pattern, which is the framework's documented dependency-injection idiom, not a bug:
+# FastAPI evaluates these defaults per-request, they are not mutable-default footguns.
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]

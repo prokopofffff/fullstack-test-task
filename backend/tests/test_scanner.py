@@ -19,9 +19,7 @@ def test_suspicious_extension():
 
 
 def test_size_over_threshold():
-    assert scan("big.bin", BIG, "application/octet-stream").details == (
-        "file is larger than 10 MB"
-    )
+    assert scan("big.bin", BIG, "application/octet-stream").details == ("file is larger than 10 MB")
 
 
 def test_size_exactly_at_threshold_is_clean():
@@ -29,9 +27,7 @@ def test_size_exactly_at_threshold_is_clean():
 
 
 def test_pdf_mime_mismatch():
-    assert scan("doc.pdf", 10, "text/plain").details == (
-        "pdf extension does not match mime type"
-    )
+    assert scan("doc.pdf", 10, "text/plain").details == ("pdf extension does not match mime type")
 
 
 def test_pdf_with_octet_stream_is_allowed():
@@ -45,6 +41,4 @@ def test_reason_order_is_extension_then_size_then_mime():
 
 
 def test_extension_matching_is_case_insensitive():
-    assert scan("EVIL.EXE", 6, "application/x-msdownload").details == (
-        "suspicious extension .exe"
-    )
+    assert scan("EVIL.EXE", 6, "application/x-msdownload").details == ("suspicious extension .exe")

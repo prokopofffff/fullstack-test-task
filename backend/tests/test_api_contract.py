@@ -1,7 +1,16 @@
 FILE_FIELDS = {
-    "id", "title", "original_name", "mime_type", "size", "processing_status",
-    "scan_status", "scan_details", "metadata_json", "requires_attention",
-    "created_at", "updated_at",
+    "id",
+    "title",
+    "original_name",
+    "mime_type",
+    "size",
+    "processing_status",
+    "scan_status",
+    "scan_details",
+    "metadata_json",
+    "requires_attention",
+    "created_at",
+    "updated_at",
 }
 ALERT_FIELDS = {"id", "file_id", "level", "message", "created_at"}
 
@@ -60,9 +69,7 @@ async def test_patch_is_visible_to_the_very_next_read(client, upload, wait_termi
         assert patched.status_code == 200
         fetched = await client.get(f"/files/{item['id']}")
         assert fetched.status_code == 200
-        assert fetched.json()["title"] == new_title, (
-            f"попытка {attempt}: GET обогнал коммит PATCH"
-        )
+        assert fetched.json()["title"] == new_title, f"попытка {attempt}: GET обогнал коммит PATCH"
 
 
 async def test_download_returns_original_bytes(client, upload):

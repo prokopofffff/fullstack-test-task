@@ -58,7 +58,8 @@ async def test_pdf_page_count(upload, wait_terminal):
 
 
 async def test_two_suspicious_reasons_are_joined(upload, wait_terminal):
-    item = await upload("Два повода", "big.exe", b"\0" * (10 * 1024 * 1024 + 1),
-                        "application/x-msdownload")
+    item = await upload(
+        "Два повода", "big.exe", b"\0" * (10 * 1024 * 1024 + 1), "application/x-msdownload"
+    )
     final = await wait_terminal(item["id"])
     assert final["scan_details"] == "suspicious extension .exe, file is larger than 10 MB"

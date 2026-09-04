@@ -37,7 +37,6 @@ services:
       HOME: /tmp
     volumes:
       - ./backend:/backend
-      - backend-storage:/backend/storage
     depends_on:
       backend-db:
         condition: service_healthy

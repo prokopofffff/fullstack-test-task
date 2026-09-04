@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_file_service
 from src.core.db import get_session
+from src.domain.models import StoredFile
 from src.schemas.files import FileItem, FileUpdate
 from src.services.files import FileService
 from src.worker.tasks import process_file
@@ -16,7 +17,7 @@ async def list_files(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     service: FileService = Depends(get_file_service),
-):
+) -> list[StoredFile]:
     return await service.list(limit=limit, offset=offset)
 
 
@@ -27,7 +28,7 @@ async def create_file(
     file: UploadFile = File(...),
     service: FileService = Depends(get_file_service),
     session: AsyncSession = Depends(get_session),
-):
+) -> StoredFile:
     item = await service.create(title=title, upload_file=file)
     # get_session больше не коммитит сам (см. src/core/db.py) — коммит здесь
     # обязателен: без него ничего не попадёт в БД, а server_default-поля
@@ -39,7 +40,7 @@ async def create_file(
 
 
 @router.get("/files/{file_id}", response_model=FileItem)
-async def get_file(file_id: str, service: FileService = Depends(get_file_service)):
+async def get_file(file_id: str, service: FileService = Depends(get_file_service)) -> StoredFile:
     return await service.get(file_id)
 
 
@@ -49,7 +50,7 @@ async def update_file(
     payload: FileUpdate,
     service: FileService = Depends(get_file_service),
     session: AsyncSession = Depends(get_session),
-):
+) -> StoredFile:
     item = await service.rename(file_id=file_id, title=payload.title)
     # Тот же приём, что и в create_file/delete_file: get_session больше не
     # коммитит в фазе очистки, поэтому маршрут обязан сделать это сам, до
@@ -65,7 +66,9 @@ async def update_file(
 
 
 @router.get("/files/{file_id}/download")
-async def download_file(file_id: str, service: FileService = Depends(get_file_service)):
+async def download_file(
+    file_id: str, service: FileService = Depends(get_file_service)
+) -> FileResponse:
     item, path = await service.path_for_download(file_id)
     return FileResponse(path=path, media_type=item.mime_type, filename=item.original_name)
 
@@ -75,7 +78,7 @@ async def delete_file(
     file_id: str,
     service: FileService = Depends(get_file_service),
     session: AsyncSession = Depends(get_session),
-):
+) -> None:
     await service.remove(file_id)
     # get_session больше не коммитит сам (см. src/core/db.py) — коммит здесь
     # обязателен, иначе удаление откатится при закрытии сессии и клиент

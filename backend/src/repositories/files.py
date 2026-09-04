@@ -21,15 +21,10 @@ class FileRepository:
             raise FileNotFound()
         return found
 
-    async def list(self, limit: int = 100, offset: int = 0) -> list[StoredFile]:
-        result = await self._session.execute(
-            select(StoredFile)
-            .order_by(StoredFile.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        return list(result.scalars().all())
-
+    # list_stale встаёт перед list(): начиная со следующего def в теле класса имя
+    # `list` в области видимости класса уже указывает на сам метод list() ниже, а
+    # не на builtin — mypy резолвит аннотации типов по этой области видимости и
+    # ругается "Function is not valid as a type". Порядок объявления здесь важен.
     async def list_stale(
         self, older_than: datetime, statuses: list[ProcessingStatus]
     ) -> list[StoredFile]:
@@ -38,6 +33,12 @@ class FileRepository:
                 StoredFile.processing_status.in_([s.value for s in statuses]),
                 StoredFile.updated_at < older_than,
             )
+        )
+        return list(result.scalars().all())
+
+    async def list(self, limit: int = 100, offset: int = 0) -> list[StoredFile]:
+        result = await self._session.execute(
+            select(StoredFile).order_by(StoredFile.created_at.desc()).limit(limit).offset(offset)
         )
         return list(result.scalars().all())
 

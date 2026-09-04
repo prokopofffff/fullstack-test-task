@@ -21,8 +21,13 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 def make_file(**overrides) -> StoredFile:
     file_id = str(uuid4())
     defaults = dict(
-        id=file_id, title="t", original_name="a.txt", stored_name=f"{file_id}.txt",
-        mime_type="text/plain", size=1, processing_status=ProcessingStatus.UPLOADED,
+        id=file_id,
+        title="t",
+        original_name="a.txt",
+        stored_name=f"{file_id}.txt",
+        mime_type="text/plain",
+        size=1,
+        processing_status=ProcessingStatus.UPLOADED,
     )
     return StoredFile(**{**defaults, **overrides})
 

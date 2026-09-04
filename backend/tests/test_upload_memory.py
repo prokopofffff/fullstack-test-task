@@ -16,7 +16,9 @@ def anon_bytes() -> int:
     """
     out = subprocess.run(
         ["docker", "exec", "backend", "cat", "/sys/fs/cgroup/memory.stat"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     for line in out.stdout.splitlines():
         key, _, value = line.partition(" ")
@@ -36,6 +38,7 @@ async def test_upload_memory_does_not_scale_with_file_size(client, wait_terminal
     плюс `write_bytes(content)` держали в куче несколько копий, и она росла
     линейно от размера. Потоковая запись делает рост постоянным.
     """
+
     async def upload(size: int) -> int:
         before = anon_bytes()
         response = await client.post(
@@ -53,7 +56,7 @@ async def test_upload_memory_does_not_scale_with_file_size(client, wait_terminal
     # Файл в 100 раз больше не должен давать пропорционального роста кучи.
     # Порог намеренно щедрый: важен порядок величины, а не точное число.
     assert large_growth < SMALL, (
-        f"куча выросла на {large_growth / 1024 ** 2:.1f} MiB при загрузке "
-        f"{LARGE / 1024 ** 2:.0f} MiB (на {SMALL / 1024 ** 2:.0f} MiB файле было "
-        f"{small_growth / 1024 ** 2:.1f} MiB) — похоже, файл снова буферизуется целиком"
+        f"куча выросла на {large_growth / 1024**2:.1f} MiB при загрузке "
+        f"{LARGE / 1024**2:.0f} MiB (на {SMALL / 1024**2:.0f} MiB файле было "
+        f"{small_growth / 1024**2:.1f} MiB) — похоже, файл снова буферизуется целиком"
     )

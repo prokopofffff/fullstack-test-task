@@ -14,9 +14,5 @@ _storage = LocalFileStorage(
 )
 
 
-def get_storage() -> LocalFileStorage:
-    return _storage
-
-
 def get_file_service(session: AsyncSession = Depends(get_session)) -> FileService:
     return FileService(FileRepository(session), _storage)

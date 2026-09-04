@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     @field_validator("cors_origins", mode="before")
     @classmethod
-    def _split_origins(cls, value):
+    def _split_origins(cls, value: Any) -> Any:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value

@@ -1,5 +1,8 @@
 import asyncio
+from typing import Any
 
+from billiard.einfo import ExceptionInfo
+from celery import Task
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -34,9 +37,10 @@ async def _process(file_id: str) -> None:
         item.scan_status = verdict.status.value
         item.scan_details = verdict.details
         item.requires_attention = verdict.requires_attention
-        item.metadata_json = item.pending_metadata_json or make_accumulator(
-            item.original_name, item.size, item.mime_type
-        ).result()
+        item.metadata_json = (
+            item.pending_metadata_json
+            or make_accumulator(item.original_name, item.size, item.mime_type).result()
+        )
         item.pending_metadata_json = None
         item.processing_status = ProcessingStatus.PROCESSED
 
@@ -66,13 +70,24 @@ async def _mark_failed(file_id: str) -> None:
         await session.commit()
 
 
-class ProcessFileTask(celery_app.Task):
-    def on_failure(self, exc, task_id, args, kwargs, einfo) -> None:
+# celery-types объявляет Task как Generic для проверки типов, но сам класс
+# celery.Task в рантайме __class_getitem__ не поддерживает — Task[..., None]
+# падает с "TypeError: type 'Task' is not subscriptable" при импорте воркером
+# и celery beat. Поэтому не параметризуем и точечно снимаем это требование mypy.
+class ProcessFileTask(Task):  # type: ignore[type-arg]
+    def on_failure(
+        self,
+        exc: Exception,
+        task_id: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        einfo: ExceptionInfo,
+    ) -> None:
         file_id = args[0] if args else kwargs.get("file_id")
         if file_id:
             asyncio.run(_mark_failed(file_id))
 
 
 @celery_app.task(base=ProcessFileTask, bind=True, name="src.worker.tasks.process_file")
-def process_file(self, file_id: str) -> None:
+def process_file(self: ProcessFileTask, file_id: str) -> None:
     asyncio.run(_process(file_id))

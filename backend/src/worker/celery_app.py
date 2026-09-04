@@ -47,4 +47,3 @@ celery_app.conf.update(
 # initialized module. Тесты, которым нужен полный celery_app.tasks без
 # реального запуска воркера, форсируют импорт сами —
 # см. tests/test_worker_config.py.
-

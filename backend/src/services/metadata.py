@@ -1,13 +1,13 @@
 import codecs
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 PDF_PAGE_MARKER = b"/Type /Page"
 
 
 class MetadataAccumulator(Protocol):
     def feed(self, chunk: bytes) -> None: ...
-    def result(self) -> dict: ...
+    def result(self) -> dict[str, Any]: ...
 
 
 class _Base:
@@ -21,7 +21,7 @@ class _Base:
     def feed(self, chunk: bytes) -> None:
         return None
 
-    def result(self) -> dict:
+    def result(self) -> dict[str, Any]:
         return dict(self._common)
 
 
@@ -61,7 +61,7 @@ class TextAccumulator(_Base):
     def feed(self, chunk: bytes) -> None:
         self._consume(self._decoder.decode(chunk))
 
-    def result(self) -> dict:
+    def result(self) -> dict[str, Any]:
         self._consume(self._decoder.decode(b"", final=True))
         data = super().result()
         data["line_count"] = self._line_count + (1 if self._trailing_content else 0)
@@ -80,9 +80,9 @@ class PdfAccumulator(_Base):
     def feed(self, chunk: bytes) -> None:
         window = self._tail + chunk
         self._count += window.count(PDF_PAGE_MARKER)
-        self._tail = window[-(len(PDF_PAGE_MARKER) - 1):]
+        self._tail = window[-(len(PDF_PAGE_MARKER) - 1) :]
 
-    def result(self) -> dict:
+    def result(self) -> dict[str, Any]:
         data = super().result()
         data["approx_page_count"] = max(self._count, 1)
         return data

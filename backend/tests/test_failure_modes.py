@@ -121,6 +121,8 @@ async def test_orphan_from_broker_outage_is_reconciled(client, upload, wait_term
     finally:
         compose("start", "backend-redis")
 
+    assert response.status_code == 201
+
     files = (await client.get("/files")).json()
     orphan = next(f for f in files if f["title"] == "Осиротевший")
     assert orphan["processing_status"] == "uploaded"
@@ -132,10 +134,19 @@ async def test_orphan_from_broker_outage_is_reconciled(client, upload, wait_term
     # побочных эффектов для остальных тестов (сам backend-worker и beat
     # продолжают жить с settings.stale_after_seconds по умолчанию).
     subprocess.run(
-        ["docker", "exec", "-e", "STALE_AFTER_SECONDS=0", "backend-worker",
-         "uv", "run", "python", "-c",
-         "from src.worker.reconciler import _reconcile; import asyncio;"
-         " print(asyncio.run(_reconcile()))"],
+        [
+            "docker",
+            "exec",
+            "-e",
+            "STALE_AFTER_SECONDS=0",
+            "backend-worker",
+            "uv",
+            "run",
+            "python",
+            "-c",
+            "from src.worker.reconciler import _reconcile; import asyncio;"
+            " print(asyncio.run(_reconcile()))",
+        ],
         check=True,
     )
     final = await wait_terminal(orphan["id"], timeout=60)

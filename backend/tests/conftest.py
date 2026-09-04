@@ -21,8 +21,9 @@ async def client():
 
 @pytest.fixture
 def upload(client):
-    async def _upload(title: str, filename: str, content: bytes,
-                      content_type: str = "application/octet-stream") -> dict:
+    async def _upload(
+        title: str, filename: str, content: bytes, content_type: str = "application/octet-stream"
+    ) -> dict:
         response = await client.post(
             "/files",
             data={"title": title},
