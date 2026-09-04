@@ -12,9 +12,13 @@ BASE = {
 }
 
 
-def test_db_url_is_assembled_from_parts(monkeypatch):
+@pytest.fixture
+def base_env(monkeypatch):
     for key, value in BASE.items():
         monkeypatch.setenv(key, value)
+
+
+def test_db_url_is_assembled_from_parts(base_env):
     settings = Settings()
     assert settings.db_url == "postgresql+asyncpg://u:p@h:5433/d"
 
@@ -27,16 +31,12 @@ def test_missing_required_variable_fails_loudly(monkeypatch):
         Settings()
 
 
-def test_cors_origins_parsed_from_comma_separated(monkeypatch):
-    for key, value in BASE.items():
-        monkeypatch.setenv(key, value)
+def test_cors_origins_parsed_from_comma_separated(base_env, monkeypatch):
     monkeypatch.setenv("CORS_ORIGINS", "http://a.local, http://b.local")
     assert Settings().cors_origins == ["http://a.local", "http://b.local"]
 
 
-def test_upload_limit_is_far_above_the_suspicious_threshold(monkeypatch):
-    for key, value in BASE.items():
-        monkeypatch.setenv(key, value)
+def test_upload_limit_is_far_above_the_suspicious_threshold(base_env):
     settings = Settings()
     assert settings.max_upload_size == 1073741824
     assert settings.suspicious_size_threshold == 10 * 1024 * 1024
