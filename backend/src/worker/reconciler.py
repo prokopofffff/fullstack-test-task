@@ -13,8 +13,16 @@ STUCK_STATUSES = [ProcessingStatus.UPLOADED, ProcessingStatus.PROCESSING]
 async def _reconcile() -> int:
     cutoff = datetime.now(UTC) - timedelta(seconds=settings.stale_after_seconds)
     async with async_session_maker() as session:
-        stale = await FileRepository(session).list_stale(cutoff, STUCK_STATUSES)
+        repo = FileRepository(session)
+        stale = await repo.list_stale(cutoff, STUCK_STATUSES, limit=settings.reconcile_batch_size)
         ids = [item.id for item in stale]
+        # Сдвигаем updated_at до диспатча: иначе запись, не успевшая
+        # обработаться за один RECONCILE_INTERVAL_SECONDS, снова попадёт в
+        # list_stale на следующем тике и переотправится второй раз, третий
+        # и т.д., пока брокер и воркер не захлебнутся дублями одного и того
+        # же файла.
+        await repo.touch(ids)
+        await session.commit()
     for file_id in ids:
         process_file.delay(file_id)
     return len(ids)

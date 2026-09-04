@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     stale_after_seconds: int = 300
     reconcile_interval_seconds: int = 60
+    reconcile_batch_size: int = 100
 
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000"]

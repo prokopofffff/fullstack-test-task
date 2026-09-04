@@ -10,6 +10,11 @@ export function useResource<T>(fetcher: (signal: AbortSignal) => Promise<T>, opt
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Тикает в finally после КАЖДОЙ попытки load(), успешной или нет. Таймер
+  // ниже перевзводится по этому счётчику, а не по data: раньше он зависел от
+  // data, и одна неудачная попытка (data не меняется при ошибке) навсегда
+  // останавливала поллинг — следующий таймер было некому поставить.
+  const [tick, setTick] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
   const loadedRef = useRef(false);
 
@@ -32,6 +37,7 @@ export function useResource<T>(fetcher: (signal: AbortSignal) => Promise<T>, opt
       if (!controller.signal.aborted) {
         setIsLoading(false);
         setIsRefreshing(false);
+        setTick((value) => value + 1);
       }
     }
   }, [fetcher]);
@@ -42,10 +48,10 @@ export function useResource<T>(fetcher: (signal: AbortSignal) => Promise<T>, opt
   }, [load]);
 
   useEffect(() => {
-    if (!data || !pollWhile || !pollWhile(data)) return;
+    if (tick === 0 || !data || !pollWhile || !pollWhile(data)) return;
     const timer = setTimeout(() => void load(), intervalMs);
     return () => clearTimeout(timer);
-  }, [data, pollWhile, intervalMs, load]);
+  }, [tick, data, pollWhile, intervalMs, load]);
 
   return { data, isLoading, isRefreshing, error, refresh: load };
 }

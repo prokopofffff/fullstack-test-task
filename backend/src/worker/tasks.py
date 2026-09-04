@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from src.core.config import settings
-from src.domain.enums import AlertLevel, ProcessingStatus, ScanStatus
+from src.domain.enums import TERMINAL_STATUSES, AlertLevel, ProcessingStatus, ScanStatus
 from src.repositories.alerts import AlertRepository
 from src.repositories.files import FileRepository
 from src.services.metadata import make_accumulator
@@ -30,17 +30,16 @@ async def _process(file_id: str) -> None:
         item = await files.get(file_id)
         if item is None:
             return
-        if item.processing_status == ProcessingStatus.PROCESSED:
+        if item.processing_status in TERMINAL_STATUSES:
             return
 
         verdict = scan(item.original_name, item.size, item.mime_type)
         item.scan_status = verdict.status.value
         item.scan_details = verdict.details
         item.requires_attention = verdict.requires_attention
-        item.metadata_json = (
-            item.pending_metadata_json
-            or make_accumulator(item.original_name, item.size, item.mime_type).result()
-        )
+        item.metadata_json = item.pending_metadata_json or make_accumulator(
+            item.original_name, item.mime_type
+        ).result(item.size)
         item.pending_metadata_json = None
         item.processing_status = ProcessingStatus.PROCESSED
 

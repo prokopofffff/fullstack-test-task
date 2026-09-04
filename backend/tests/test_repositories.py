@@ -10,11 +10,12 @@ from src.domain.models import StoredFile
 from src.repositories.alerts import AlertRepository
 from src.repositories.files import FileRepository
 
-# All tests in this module share one event loop. `engine`/`async_session_maker`
-# are process-wide singletons (src/core/db.py) whose pooled asyncpg connections
-# are bound to the loop they were opened on; with pytest-asyncio's default
-# function-scoped loop, a connection pooled by one test and reused by the next
-# (running on a fresh loop) raises "Future attached to a different loop".
+# Все тесты в этом модуле работают в одном цикле событий. `engine`/
+# `async_session_maker` — процесс-широкие синглтоны (src/core/db.py), чьи
+# пулcированные соединения asyncpg привязаны к циклу, в котором были открыты;
+# при дефолтном для pytest-asyncio цикле на каждый тест соединение, взятое из
+# пула одним тестом и переиспользованное следующим (уже в новом цикле),
+# падает с "Future attached to a different loop".
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 
@@ -79,14 +80,52 @@ async def test_list_stale_finds_only_old_non_terminal_rows():
         assert done.id not in ids
 
 
+async def test_list_stale_respects_limit():
+    async with async_session_maker() as session:
+        repo = FileRepository(session)
+        for _ in range(3):
+            await repo.add(make_file(processing_status=ProcessingStatus.UPLOADED))
+        await session.commit()
+    async with async_session_maker() as session:
+        # cutoff в будущем — приём из соседнего теста, чтобы не ждать
+        # реального времени: свежедобавленные строки уже "старше" cutoff.
+        stale = await FileRepository(session).list_stale(
+            older_than=datetime.now(UTC) + timedelta(minutes=1),
+            statuses=[ProcessingStatus.UPLOADED],
+            limit=2,
+        )
+        # В базе к этому моменту как минимум 3 подходящие строки (свои плюс,
+        # возможно, от других тестов) — limit обязан обрезать выборку, а не
+        # просто оказаться не меньше её размера.
+        assert len(stale) == 2
+
+
+async def test_touch_bumps_updated_at():
+    item = make_file(processing_status=ProcessingStatus.UPLOADED)
+    async with async_session_maker() as session:
+        repo = FileRepository(session)
+        await repo.add(item)
+        await session.commit()
+        await session.refresh(item)
+        original_updated_at = item.updated_at
+
+    async with async_session_maker() as session:
+        await FileRepository(session).touch([item.id])
+        await session.commit()
+
+    async with async_session_maker() as session:
+        refreshed = await FileRepository(session).get_or_raise(item.id)
+        assert refreshed.updated_at > original_updated_at
+
+
 async def test_alert_exists_guards_duplicates():
     item = make_file()
     async with async_session_maker() as session:
         files = FileRepository(session)
         await files.add(item)
-        # Flush the pending file before adding the alert: StoredFile and Alert
-        # have no ORM relationship(), so nothing orders their INSERTs within a
-        # single flush, and inserting the alert first would violate its FK.
+        # flush() файла до добавления алерта: у StoredFile и Alert нет
+        # ORM relationship(), поэтому порядок их INSERT внутри одного flush
+        # ничем не гарантирован, а вставка алерта первым нарушила бы его FK.
         await files.flush()
         await AlertRepository(session).add(item.id, AlertLevel.INFO, "ok")
         await session.commit()

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.domain.enums import ProcessingStatus
@@ -39,6 +39,19 @@ class StoredFile(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    # Реконсилятор бьёт этим запросом (processing_status IN (...) AND
+    # updated_at < cutoff) раз в RECONCILE_INTERVAL_SECONDS. Полный индекс по
+    # updated_at бесполезен для WHERE по статусу, а partial-индекс покрывает
+    # ровно те строки, что реально сканирует запрос, и не растёт вместе с
+    # processed/failed-хвостом таблицы (подавляющим большинством строк).
+    __table_args__ = (
+        Index(
+            "ix_files_stale",
+            "updated_at",
+            postgresql_where=text("processing_status IN ('uploaded', 'processing')"),
+        ),
     )
 
 

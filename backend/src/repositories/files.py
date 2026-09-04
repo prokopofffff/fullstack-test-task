@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.exceptions import FileNotFound
@@ -26,15 +26,35 @@ class FileRepository:
     # не на builtin — mypy резолвит аннотации типов по этой области видимости и
     # ругается "Function is not valid as a type". Порядок объявления здесь важен.
     async def list_stale(
-        self, older_than: datetime, statuses: list[ProcessingStatus]
+        self, older_than: datetime, statuses: list[ProcessingStatus], limit: int = 100
     ) -> list[StoredFile]:
+        # order_by(updated_at) + limit: без него один и тот же самый старый
+        # хвост зависших записей монополизировал бы выборку каждый тик, а
+        # остальные никогда бы не подобрались.
         result = await self._session.execute(
-            select(StoredFile).where(
+            select(StoredFile)
+            .where(
                 StoredFile.processing_status.in_([s.value for s in statuses]),
                 StoredFile.updated_at < older_than,
             )
+            .order_by(StoredFile.updated_at.asc())
+            .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def touch(self, ids: list[str]) -> None:
+        """Сдвигает `updated_at` без изменения статуса.
+
+        Нужен реконсилятору сразу после переотправки застрявших записей в
+        Celery: без этого `updated_at` не меняется до завершения задачи, и та
+        же запись снова попадёт в `list_stale` на следующем тике `beat`,
+        прежде чем воркер успеет её обработать.
+        """
+        if not ids:
+            return
+        await self._session.execute(
+            update(StoredFile).where(StoredFile.id.in_(ids)).values(updated_at=func.now())
+        )
 
     async def list(self, limit: int = 100, offset: int = 0) -> list[StoredFile]:
         result = await self._session.execute(
