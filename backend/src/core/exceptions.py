@@ -1,25 +1,31 @@
 class DomainError(Exception):
-    status_code: int = 500
+    """Базовое доменное исключение.
+
+    `kind` — транспортно-нейтральный признак ошибки (не HTTP-код): перевод
+    в конкретный код ответа делает api/errors.py, домен про HTTP не знает.
+    """
+
+    kind: str = "internal"
     detail: str = "Internal error"
 
 
 class FileNotFound(DomainError):
-    status_code = 404
+    kind = "not_found"
     detail = "File not found"
 
 
 class StoredFileMissing(DomainError):
-    status_code = 404
+    kind = "not_found"
     detail = "Stored file not found"
 
 
 class EmptyFile(DomainError):
-    status_code = 400
+    kind = "invalid_input"
     detail = "File is empty"
 
 
 class FileTooLarge(DomainError):
-    status_code = 413
+    kind = "too_large"
 
     def __init__(self, limit: int) -> None:
         self.limit = limit

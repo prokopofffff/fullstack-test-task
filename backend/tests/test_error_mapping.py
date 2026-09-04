@@ -1,13 +1,13 @@
 from src.core.exceptions import DomainError, EmptyFile, FileNotFound, FileTooLarge
 
 
-def test_domain_errors_carry_status_and_detail():
+def test_domain_errors_carry_kind_and_detail():
     assert isinstance(FileNotFound(), DomainError)
-    assert (FileNotFound().status_code, FileNotFound().detail) == (404, "File not found")
-    assert (EmptyFile().status_code, EmptyFile().detail) == (400, "File is empty")
+    assert (FileNotFound().kind, FileNotFound().detail) == ("not_found", "File not found")
+    assert (EmptyFile().kind, EmptyFile().detail) == ("invalid_input", "File is empty")
 
     too_large = FileTooLarge(limit=1024)
-    assert too_large.status_code == 413
+    assert too_large.kind == "too_large"
     assert too_large.detail == "File exceeds the 1024 byte limit"
 
 
