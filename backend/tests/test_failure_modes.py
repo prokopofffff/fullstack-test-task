@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-# Бриф велит запускать этот файл с хоста командой `cd backend && uv run
-# pytest tests/test_failure_modes.py -v`, то есть CWD — backend/. Но
+# Этот файл запускается с хоста (`cd backend && uv run pytest
+# tests/test_failure_modes.py -v`, см. README), то есть CWD — backend/. Но
 # docker-compose.dev.yml лежит на уровень выше, в корне репозитория, поэтому
 # относительный путь "docker-compose.dev.yml" не резолвится из backend/.
 # Считаем путь от расположения самого файла теста, а не от CWD.
@@ -73,14 +73,13 @@ async def test_exception_mid_pipeline_drives_row_to_failed(client, upload, wait_
     в `processing`/`uploaded` навсегда — `on_failure` обязан довести её до `failed`
     с одним critical-алертом.
 
-    Бриф предлагал подменить сохранённый файл каталогом (`IsADirectoryError` при
-    чтении). Это больше не работает: после рефакторинга на однопроходные
-    потоковые метаданные (`e0b5aa1`, `pending_metadata_json`) `process_file`
+    Классический триггер такого отказа — подменить сохранённый файл каталогом
+    (`IsADirectoryError` при чтении). Он больше не работает: после перехода на
+    однопроходные потоковые метаданные (`pending_metadata_json`) `process_file`
     ни разу не открывает файл на диске — `scan()` и сборка метаданных работают
     только с уже сохранёнными в строке полями (см. `src/worker/tasks.py::_process`,
     `src/services/scanner.py`, `src/services/metadata.py`). Проверено эмпирически:
-    буквальный сценарий из брифа (rm + mkdir на месте файла) заканчивается
-    `processed`, а не `failed`.
+    rm + mkdir на месте файла всё равно заканчивается `processed`, а не `failed`.
 
     Чтобы всё равно доказать, что путь `on_failure` жив, вызываем исключение
     иначе — CHECK-констрейнтом на таблице `files`, который запрещает ИМЕННО

@@ -37,9 +37,10 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-# B008 (function call in default argument) flags FastAPI's Depends()/Query()/File()
-# pattern, which is the framework's documented dependency-injection idiom, not a bug:
-# FastAPI evaluates these defaults per-request, they are not mutable-default footguns.
+# B008 (вызов функции в значении по умолчанию) ругается на идиому FastAPI
+# Depends()/Query()/File() в дефолтах аргументов — это не баг, а
+# документированный способ внедрения зависимостей: FastAPI вычисляет эти
+# значения на каждый запрос заново, это не мутируемый дефолт-ловушка.
 ignore = ["B008"]
 
 [tool.mypy]

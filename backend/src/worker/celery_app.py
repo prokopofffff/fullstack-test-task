@@ -37,13 +37,10 @@ celery_app.conf.update(
 # include=[...] само по себе ленивое: модули из него импортируются только
 # когда что-то вызывает loader.import_default_modules() — этим занимаются
 # bootstep'ы `celery worker`/`celery beat` при старте, уже ПОСЛЕ того, как
-# этот модуль полностью досчитан. Раньше здесь стоял принудительный вызов
-# celery_app.loader.import_default_modules() прямо тут, синхронно — он
-# ломает живое приложение: FastAPI доходит до celery_app.py через
-# src.main -> src.api.v1.files -> src.worker.tasks -> (импорт celery_app),
-# т.е. src.worker.tasks в этот момент сам ещё не досчитан. Принудительный
-# импорт reconciler.py отсюда тут же тянет обратно
-# `from src.worker.tasks import ...` и получает ImportError на partially
+# этот модуль полностью досчитан. Форсировать импорт прямо здесь нельзя:
+# FastAPI доходит до celery_app.py через src.main -> src.api.v1.files ->
+# src.worker.tasks -> (импорт celery_app), то есть src.worker.tasks в этот
+# момент сам ещё не досчитан, и импорт reconciler.py отсюда тут же тянет
+# обратно `from src.worker.tasks import ...` — ImportError на partially
 # initialized module. Тесты, которым нужен полный celery_app.tasks без
-# реального запуска воркера, форсируют импорт сами —
-# см. tests/test_worker_config.py.
+# реального запуска воркера, форсируют импорт сами — см. tests/test_worker_config.py.

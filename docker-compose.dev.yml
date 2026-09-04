@@ -21,18 +21,19 @@ services:
                '--uid', 'nobody', '--concurrency=1' ]
     container_name: backend-worker
     env_file: ".env"
-    # --uid nobody drops root, but HOME still points at /root (mode 700), which
-    # nobody can't even traverse. asyncpg's connect path stats $HOME/.postgresql/*
-    # while negotiating SSL and dies with PermissionError before a query is ever
-    # sent. Point HOME at a directory nobody can read so the connection succeeds.
+    # --uid nobody сбрасывает root, но HOME всё ещё указывает на /root (права 700),
+    # куда nobody не может даже зайти. asyncpg при коннекте делает stat
+    # $HOME/.postgresql/* во время согласования SSL и падает с PermissionError
+    # раньше первого запроса. HOME указывает на каталог, который nobody может
+    # прочитать, — тогда подключение проходит.
     #
-    # --concurrency=1: a single worker process is what makes
-    # tests/test_worker_loop.py meaningful — every task is guaranteed to run
-    # sequentially in the same process, so a regression back to the process-wide
-    # pool in src/core/db.py shows up immediately instead of only on a lucky
-    # single-core run. The workload here (one UPDATE plus one INSERT per task)
-    # doesn't need more, and worker_prefetch_multiplier=1 already keeps the
-    # queue from backing up.
+    # --concurrency=1: только один процесс-исполнитель делает
+    # tests/test_worker_loop.py осмысленным — все задачи гарантированно
+    # выполняются последовательно в одном процессе, поэтому регресс к
+    # процесс-широкому пулу из src/core/db.py всплывает сразу, а не только на
+    # удачном однопроцессорном прогоне. Нагрузка здесь (два SELECT, один
+    # UPDATE и один INSERT на задачу) большего не требует, а
+    # worker_prefetch_multiplier=1 и так не даёт очереди разрастись.
     environment:
       HOME: /tmp
     volumes:
