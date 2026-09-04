@@ -6,6 +6,7 @@ import { Alert, Button, Card, Col, Container, Row } from "react-bootstrap";
 import { useFiles } from "@/features/file-list/model/useFiles";
 import { FilesTable } from "@/features/file-list/ui/FilesTable";
 import { downloadUrl } from "@/features/file-list/api/filesApi";
+import { hasPending } from "@/entities/file/model";
 
 import { useAlerts } from "@/features/alert-feed/model/useAlerts";
 import { AlertsTable } from "@/features/alert-feed/ui/AlertsTable";
@@ -15,7 +16,7 @@ import { UploadFileModal } from "@/features/file-upload/ui/UploadFileModal";
 
 export default function Page() {
   const filesResource = useFiles();
-  const alertsResource = useAlerts();
+  const alertsResource = useAlerts(filesResource.data ? hasPending(filesResource.data) : false);
 
   const [showModal, setShowModal] = useState(false);
 

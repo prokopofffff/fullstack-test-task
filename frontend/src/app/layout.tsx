@@ -5,7 +5,6 @@ import { Container } from "react-bootstrap";
 export const metadata: Metadata = {
   title: "Тестовое задание Fullstack",
   description: "Тестовое задание Fullstack",
-  icons: { icon: "/favicon.ico" },
 };
 
 export default async function RootLayout({
