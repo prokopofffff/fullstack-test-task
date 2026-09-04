@@ -12,11 +12,7 @@
 
 ## Переменные окружения
 
-`.env` в репозиторий не коммитится. Скопируйте шаблон и при необходимости поправьте:
-
-```bash
-cp .env.example .env
-```
+`.env` в репозиторий не коммитится, шаблон — `.env.example`.
 
 | Переменная | Обязательна | По умолчанию | Назначение |
 |---|---|---|---|
@@ -31,17 +27,17 @@ cp .env.example .env
 | `CORS_ORIGINS` | нет | `http://localhost:3000` | список origin через запятую |
 | `NEXT_PUBLIC_API_URL` | да | — | адрес API; вшивается **на этапе сборки** фронтенда |
 
-Остальные поля `Settings` (`MAX_REQUEST_OVERHEAD`, `UPLOAD_CHUNK_SIZE`, `SUSPICIOUS_SIZE_THRESHOLD`, `SUSPICIOUS_EXTENSIONS`, `STALE_AFTER_SECONDS`, `RECONCILE_INTERVAL_SECONDS`, `RECONCILE_BATCH_SIZE`) в таблицу не вынесены: у них есть разумные значения по умолчанию в `core/config.py`, в `.env`/`.env.example` они не задаются и переопределяются обычной переменной окружения при необходимости. `MAX_REQUEST_OVERHEAD` (по умолчанию 1 МиБ) — запас поверх `MAX_UPLOAD_SIZE` для грубого барьера по заголовку `Content-Length` (`api/middleware.py`): multipart-конверт (граница, заголовки частей, имя файла, поле `title`) добавляет байты сверх самого файла, поэтому порог барьера — сумма, а не сам `MAX_UPLOAD_SIZE`.
+Остальные поля `Settings` (пороги скана, размер чанка, интервалы реконсилятора, запас на multipart-конверт) в `.env` не выносятся: дефолты лежат в `core/config.py` и переопределяются переменной окружения.
 
 **Запуск:**
-1. ```cp .env.example .env```
-2. ```docker compose -f docker-compose.dev.yml up```
-3. ```docker exec -it backend alembic upgrade head```
 
+```bash
+cp .env.example .env
+docker compose -f docker-compose.dev.yml up -d
+docker exec backend alembic upgrade head
+```
 
-**Открыть фронт:** ```http://localhost:3000/test``` 
-
-**Открыть бэк:** ```http://localhost:8000/docs```
+Фронт — `http://localhost:3000/test`, бэк — `http://localhost:8000/docs`.
 
 ## Архитектура
 
