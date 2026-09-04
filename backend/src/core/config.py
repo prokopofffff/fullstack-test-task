@@ -18,6 +18,13 @@ class Settings(BaseSettings):
 
     storage_dir: Path = Path("/backend/storage/files")
     max_upload_size: int = 1024 * 1024 * 1024
+    # Запас поверх max_upload_size для ASGI-барьера по Content-Length
+    # (src/api/middleware.py): multipart-конверт (граница, заголовки частей,
+    # имя файла, поле title) добавляет байты сверх самого файла, поэтому
+    # порог барьера — max_upload_size + max_request_overhead, а не
+    # max_upload_size. Точный лимит по-прежнему держит потоковая запись в
+    # LocalFileStorage.save_stream.
+    max_request_overhead: int = 1024 * 1024
     upload_chunk_size: int = 1024 * 1024
 
     suspicious_size_threshold: int = 10 * 1024 * 1024
