@@ -5,8 +5,9 @@ import time
 import httpx
 import pytest
 
+from src.domain.enums import TERMINAL_STATUSES
+
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
-TERMINAL_STATUSES = {"processed", "failed"}
 
 
 @pytest.fixture(scope="session")
