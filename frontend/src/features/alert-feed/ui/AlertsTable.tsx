@@ -7,14 +7,20 @@ import { formatDate } from "@/shared/lib/format";
 type AlertsTableProps = {
   alerts: AlertItem[];
   isLoading: boolean;
+  isRefreshing?: boolean;
 };
 
-export function AlertsTable({ alerts, isLoading }: AlertsTableProps) {
+export function AlertsTable({ alerts, isLoading, isRefreshing }: AlertsTableProps) {
   return (
     <Card className="shadow-sm border-0">
       <Card.Header className="bg-white border-0 pt-4 px-4">
         <div className="d-flex justify-content-between align-items-center">
-          <h2 className="h5 mb-0">Алерты</h2>
+          <h2 className="h5 mb-0 d-flex align-items-center gap-2">
+            Алерты
+            {isRefreshing ? (
+              <Spinner animation="border" size="sm" variant="secondary" role="status" aria-label="Обновление" />
+            ) : null}
+          </h2>
           <Badge bg="secondary">{alerts.length}</Badge>
         </div>
       </Card.Header>
@@ -24,7 +30,10 @@ export function AlertsTable({ alerts, isLoading }: AlertsTableProps) {
             <Spinner animation="border" />
           </div>
         ) : (
-          <div className="table-responsive">
+          <div
+            className="table-responsive"
+            style={isRefreshing ? { opacity: 0.6, transition: "opacity 0.15s" } : undefined}
+          >
             <Table hover bordered className="align-middle mb-0">
               <thead className="table-light">
                 <tr>

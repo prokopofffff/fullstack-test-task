@@ -67,10 +67,15 @@ export default function Page() {
           <FilesTable
             files={filesResource.data ?? []}
             isLoading={filesResource.isLoading}
+            isRefreshing={filesResource.isRefreshing}
             downloadUrl={downloadUrl}
           />
 
-          <AlertsTable alerts={alertsResource.data ?? []} isLoading={alertsResource.isLoading} />
+          <AlertsTable
+            alerts={alertsResource.data ?? []}
+            isLoading={alertsResource.isLoading}
+            isRefreshing={alertsResource.isRefreshing}
+          />
         </Col>
       </Row>
 

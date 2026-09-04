@@ -10,7 +10,6 @@ from src.storage.local import LocalFileStorage
 _storage = LocalFileStorage(
     root=settings.storage_dir,
     max_size=settings.max_upload_size,
-    chunk_size=settings.upload_chunk_size,
 )
 
 

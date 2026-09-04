@@ -54,7 +54,7 @@ class FileService:
             or "application/octet-stream"
         )
 
-        accumulator = make_accumulator(original_name, 0, mime_type)
+        accumulator = make_accumulator(original_name, mime_type)
         size = await self._storage.save_stream(
             stored_name, self._iter_chunks(upload_file), observer=accumulator
         )
@@ -63,10 +63,10 @@ class FileService:
             self._storage.delete(stored_name)
             raise EmptyFile()
 
-        metadata = accumulator.result()
-        # size is only known once the stream is fully drained, so the
-        # accumulator was built with size=0; patch in the real value here.
-        metadata["size_bytes"] = size
+        # Размер известен только после того, как поток дочитан до конца,
+        # поэтому передаётся в result(), а не в конструктор — там его брать
+        # неоткуда.
+        metadata = accumulator.result(size)
 
         item = StoredFile(
             id=file_id,

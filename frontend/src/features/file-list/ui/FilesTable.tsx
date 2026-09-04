@@ -7,15 +7,21 @@ import { formatDate, formatSize } from "@/shared/lib/format";
 type FilesTableProps = {
   files: FileItem[];
   isLoading: boolean;
+  isRefreshing?: boolean;
   downloadUrl: (id: string) => string;
 };
 
-export function FilesTable({ files, isLoading, downloadUrl }: FilesTableProps) {
+export function FilesTable({ files, isLoading, isRefreshing, downloadUrl }: FilesTableProps) {
   return (
     <Card className="shadow-sm border-0 mb-4">
       <Card.Header className="bg-white border-0 pt-4 px-4">
         <div className="d-flex justify-content-between align-items-center">
-          <h2 className="h5 mb-0">Файлы</h2>
+          <h2 className="h5 mb-0 d-flex align-items-center gap-2">
+            Файлы
+            {isRefreshing ? (
+              <Spinner animation="border" size="sm" variant="secondary" role="status" aria-label="Обновление" />
+            ) : null}
+          </h2>
           <Badge bg="secondary">{files.length}</Badge>
         </div>
       </Card.Header>
@@ -25,7 +31,10 @@ export function FilesTable({ files, isLoading, downloadUrl }: FilesTableProps) {
             <Spinner animation="border" />
           </div>
         ) : (
-          <div className="table-responsive">
+          <div
+            className="table-responsive"
+            style={isRefreshing ? { opacity: 0.6, transition: "opacity 0.15s" } : undefined}
+          >
             <Table hover bordered className="align-middle mb-0">
               <thead className="table-light">
                 <tr>

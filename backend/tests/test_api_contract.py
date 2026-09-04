@@ -82,9 +82,10 @@ async def test_download_returns_original_bytes(client, upload):
 
 
 async def test_delete_removes_file(client, upload, wait_terminal):
-    # alerts.file_id now cascades on delete, so removing a file that reached
-    # a terminal status (and therefore has an alert row) succeeds and takes
-    # its alerts with it instead of hitting a foreign key violation.
+    # alerts.file_id теперь каскадится при удалении, поэтому удаление файла,
+    # дошедшего до терминального статуса (а значит, имеющего запись алерта),
+    # проходит успешно и утаскивает алерты за собой, а не падает на
+    # нарушении внешнего ключа.
     item = await upload("Удалить", "del.txt", b"bye\n", "text/plain")
     await wait_terminal(item["id"])
     response = await client.delete(f"/files/{item['id']}")
@@ -92,9 +93,14 @@ async def test_delete_removes_file(client, upload, wait_terminal):
     assert (await client.get(f"/files/{item['id']}")).status_code == 404
 
 
-async def test_lists_are_sorted_desc_and_shaped(client, upload):
-    await upload("Первый", "one.txt", b"1\n", "text/plain")
+async def test_lists_are_sorted_desc_and_shaped(client, upload, wait_terminal):
+    first = await upload("Первый", "one.txt", b"1\n", "text/plain")
     await upload("Второй", "two.txt", b"2\n", "text/plain")
+    # Дожидаемся терминального статуса хотя бы одного файла: только тогда
+    # гарантированно существует хотя бы один алерт, и проверку формы можно
+    # делать безусловно, а не под `if alerts:` (на чистой базе список
+    # алертов иначе может оказаться пустым, и проверка тихо не выполнится).
+    await wait_terminal(first["id"])
 
     files = (await client.get("/files")).json()
     assert set(files[0]) == FILE_FIELDS
@@ -103,8 +109,8 @@ async def test_lists_are_sorted_desc_and_shaped(client, upload):
     )
 
     alerts = (await client.get("/alerts")).json()
-    if alerts:
-        assert set(alerts[0]) == ALERT_FIELDS
-        assert [a["created_at"] for a in alerts] == sorted(
-            (a["created_at"] for a in alerts), reverse=True
-        )
+    assert alerts
+    assert set(alerts[0]) == ALERT_FIELDS
+    assert [a["created_at"] for a in alerts] == sorted(
+        (a["created_at"] for a in alerts), reverse=True
+    )

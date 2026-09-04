@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 
@@ -46,7 +47,7 @@ def wait_terminal(client):
             last = response.json()
             if last["processing_status"] in TERMINAL_STATUSES:
                 return last
-            time.sleep(0.2)
+            await asyncio.sleep(0.2)
         raise AssertionError(
             f"file {file_id} did not reach a terminal status in {timeout}s: {last}"
         )

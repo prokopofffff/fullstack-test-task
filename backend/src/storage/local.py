@@ -6,10 +6,9 @@ from src.storage.base import ChunkObserver
 
 
 class LocalFileStorage:
-    def __init__(self, root: Path, max_size: int, chunk_size: int) -> None:
+    def __init__(self, root: Path, max_size: int) -> None:
         self._root = Path(root)
         self._max_size = max_size
-        self._chunk_size = chunk_size
         self._root.mkdir(parents=True, exist_ok=True)
 
     def path(self, stored_name: str) -> Path:
