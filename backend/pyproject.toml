@@ -10,7 +10,41 @@ dependencies = [
     "celery[redis]>=5.6.3",
     "fastapi>=0.135.3",
     "pydantic>=2.12.5",
+    "pydantic-settings>=2.7.0",
     "python-multipart>=0.0.20",
     "sqlalchemy>=2.0.48",
     "uvicorn>=0.42.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "httpx>=0.28.0",
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+    "celery-types>=0.26.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# B008 (вызов функции в значении по умолчанию) ругается на идиому FastAPI
+# Depends()/Query()/File() в дефолтах аргументов — это не баг, а
+# документированный способ внедрения зависимостей: FastAPI вычисляет эти
+# значения на каждый запрос заново, это не мутируемый дефолт-ловушка.
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]

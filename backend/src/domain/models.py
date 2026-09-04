@@ -1,7 +1,10 @@
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from src.domain.enums import ProcessingStatus
 
 
 class Base(DeclarativeBase):
@@ -17,15 +20,19 @@ class StoredFile(Base):
     stored_name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     mime_type: Mapped[str] = mapped_column(String(255), nullable=False)
     size: Mapped[int] = mapped_column(Integer, nullable=False)
-    processing_status: Mapped[str] = mapped_column(String(50), nullable=False, default="uploaded")
+    processing_status: Mapped[str] = mapped_column(
+        String(50), nullable=False, default=ProcessingStatus.UPLOADED
+    )
     scan_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     scan_details: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     requires_attention: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    pending_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+        index=True,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -34,16 +41,32 @@ class StoredFile(Base):
         nullable=False,
     )
 
+    # Реконсилятор бьёт этим запросом (processing_status IN (...) AND
+    # updated_at < cutoff) раз в RECONCILE_INTERVAL_SECONDS. Полный индекс по
+    # updated_at бесполезен для WHERE по статусу, а partial-индекс покрывает
+    # ровно те строки, что реально сканирует запрос, и не растёт вместе с
+    # processed/failed-хвостом таблицы (подавляющим большинством строк).
+    __table_args__ = (
+        Index(
+            "ix_files_stale",
+            "updated_at",
+            postgresql_where=text("processing_status IN ('uploaded', 'processing')"),
+        ),
+    )
+
 
 class Alert(Base):
     __tablename__ = "alerts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    file_id: Mapped[str] = mapped_column(String(36), ForeignKey("files.id"), nullable=False)
+    file_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("files.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     level: Mapped[str] = mapped_column(String(50), nullable=False)
     message: Mapped[str] = mapped_column(String(500), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+        index=True,
     )

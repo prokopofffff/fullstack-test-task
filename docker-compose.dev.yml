@@ -1,46 +1,93 @@
 services:
   backend:
     build: ./backend
-    command: uvicorn src.app:app --host 0.0.0.0 --reload --port 8000
+    command: uvicorn src.main:app --host 0.0.0.0 --reload --port 8000
     container_name: backend
     volumes:
       - ./backend:/backend
-    env_file: ".env.dev"
+      - backend-storage:/backend/storage
+    env_file: ".env"
     ports:
       - "8000:8000"
     depends_on:
-      - backend-db
+      backend-db:
+        condition: service_healthy
+      backend-redis:
+        condition: service_healthy
 
   backend-worker:
     build: ./backend
-    command: [ 'celery', '-A', 'src.tasks.celery_app', 'worker', '-l', 'info' ]
+    command: [ 'celery', '-A', 'src.worker.celery_app.celery_app', 'worker', '-l', 'info',
+               '--uid', 'nobody', '--concurrency=1' ]
     container_name: backend-worker
-    env_file: ".env.dev"
+    env_file: ".env"
+    # --uid nobody сбрасывает root, но HOME всё ещё указывает на /root (права 700),
+    # куда nobody не может даже зайти. asyncpg при коннекте делает stat
+    # $HOME/.postgresql/* во время согласования SSL и падает с PermissionError
+    # раньше первого запроса. HOME указывает на каталог, который nobody может
+    # прочитать, — тогда подключение проходит.
+    #
+    # --concurrency=1: только один процесс-исполнитель делает
+    # tests/test_worker_loop.py осмысленным — все задачи гарантированно
+    # выполняются последовательно в одном процессе, поэтому регресс к
+    # процесс-широкому пулу из src/core/db.py всплывает сразу, а не только на
+    # удачном однопроцессорном прогоне. Нагрузка здесь (два SELECT, один
+    # UPDATE и один INSERT на задачу) большего не требует, а
+    # worker_prefetch_multiplier=1 и так не даёт очереди разрастись.
+    environment:
+      HOME: /tmp
     volumes:
       - ./backend:/backend
     depends_on:
-      - backend-db
+      backend-db:
+        condition: service_healthy
+      backend-redis:
+        condition: service_healthy
+
+  backend-beat:
+    build: ./backend
+    command: [ 'celery', '-A', 'src.worker.celery_app.celery_app', 'beat', '-l', 'info' ]
+    container_name: backend-beat
+    env_file: ".env"
+    volumes:
+      - ./backend:/backend
+    depends_on:
+      backend-redis:
+        condition: service_healthy
 
   backend-db:
-    image: postgres:latest
+    image: postgres:18
     container_name: backend-db
-    ports:
-      - "5433:5433"
-    env_file: ".env.dev"
+    env_file: ".env"
     volumes:
       - backend-db-volume:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -p $${PGPORT}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   backend-redis:
-    image: redis:latest
+    image: redis:8
     container_name: backend-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: frontend
     ports:
       - "3000:3000"
+    depends_on:
+      - backend
 
 volumes:
   backend-db-volume:
+  backend-storage:
