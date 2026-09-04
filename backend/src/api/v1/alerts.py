@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api.deps import Pagination, get_pagination
 from src.core.db import get_session
 from src.domain.models import Alert
 from src.repositories.alerts import AlertRepository
@@ -11,8 +12,7 @@ router = APIRouter(tags=["alerts"])
 
 @router.get("/alerts", response_model=list[AlertItem])
 async def list_alerts(
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    pagination: Pagination = Depends(get_pagination),
     session: AsyncSession = Depends(get_session),
 ) -> list[Alert]:
-    return await AlertRepository(session).list(limit=limit, offset=offset)
+    return await AlertRepository(session).list(limit=pagination.limit, offset=pagination.offset)

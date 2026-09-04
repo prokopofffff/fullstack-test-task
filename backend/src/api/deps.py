@@ -1,4 +1,6 @@
-from fastapi import Depends
+from dataclasses import dataclass
+
+from fastapi import Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
@@ -15,3 +17,15 @@ _storage = LocalFileStorage(
 
 def get_file_service(session: AsyncSession = Depends(get_session)) -> FileService:
     return FileService(FileRepository(session), _storage)
+
+
+@dataclass
+class Pagination:
+    limit: int
+    offset: int
+
+
+def get_pagination(
+    limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0)
+) -> Pagination:
+    return Pagination(limit=limit, offset=offset)
