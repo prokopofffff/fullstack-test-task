@@ -10,7 +10,6 @@ from src.core.config import settings
 from src.domain.enums import TERMINAL_STATUSES, AlertLevel, ProcessingStatus, ScanStatus
 from src.repositories.alerts import AlertRepository
 from src.repositories.files import FileRepository
-from src.services.metadata import make_accumulator
 from src.services.scanner import scan
 from src.worker.celery_app import celery_app
 
@@ -37,9 +36,11 @@ async def _process(file_id: str) -> None:
         item.scan_status = verdict.status.value
         item.scan_details = verdict.details
         item.requires_attention = verdict.requires_attention
-        item.metadata_json = item.pending_metadata_json or make_accumulator(
-            item.original_name, item.mime_type
-        ).result(item.size)
+        # pending_metadata_json всегда заполнен словарём (FileService.create
+        # кладёт минимум extension/size_bytes/mime_type) — фолбэк на
+        # make_accumulator(...).result(...) здесь был недостижим, а при
+        # срабатывании молча подставил бы нули вместо реальных метаданных.
+        item.metadata_json = item.pending_metadata_json
         item.pending_metadata_json = None
         item.processing_status = ProcessingStatus.PROCESSED
 
