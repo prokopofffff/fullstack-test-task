@@ -28,13 +28,25 @@ class FileService:
     async def rename(self, file_id: str, title: str) -> StoredFile:
         item = await self._files.get_or_raise(file_id)
         item.title = title
+        # Unit of work — сервис сам коммитит и не оставляет это маршруту (см.
+        # get_session в src/core/db.py). Коммит обязан произойти ДО ответа
+        # клиенту, иначе следующий быстрый GET может обогнать запись.
+        await self._files.commit()
+        # updated_at считается на стороне БД (onupdate=func.now()), и после
+        # UPDATE SQLAlchemy помечает это поле как требующее перечитывания даже
+        # при expire_on_commit=False. Без явного refresh сериализация ответа
+        # (она идёт вне async-контекста) падает с MissingGreenlet при попытке
+        # лениво подгрузить значение.
+        await self._files.refresh(item)
         return item
 
     async def remove(self, file_id: str) -> None:
         item = await self._files.get_or_raise(file_id)
         stored_name = item.stored_name
         await self._files.delete(item)
-        await self._files.flush()
+        # Коммит вместо flush: без него удаление откатится при закрытии
+        # сессии, и клиент получит 204, хотя запись осталась на месте.
+        await self._files.commit()
         self._storage.delete(stored_name)
 
     async def path_for_download(self, file_id: str) -> tuple[StoredFile, Path]:
@@ -79,6 +91,11 @@ class FileService:
             pending_metadata_json=metadata,
         )
         await self._files.add(item)
+        # Unit of work — сервис сам коммитит (см. rename/remove выше и
+        # src/core/db.py::get_session): без коммита server_default-поля
+        # (created_at, updated_at, requires_attention) не заполнены на
+        # момент сериализации ответа, а воркер не увидит строку вовсе.
+        await self._files.commit()
         return item
 
     async def _iter_chunks(self, upload_file: UploadFile) -> AsyncIterator[bytes]:

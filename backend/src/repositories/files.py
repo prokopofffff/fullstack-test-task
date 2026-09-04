@@ -73,3 +73,9 @@ class FileRepository:
 
     async def flush(self) -> None:
         await self._session.flush()
+
+    async def commit(self) -> None:
+        await self._session.commit()
+
+    async def refresh(self, file: StoredFile) -> None:
+        await self._session.refresh(file)

@@ -1,9 +1,7 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import get_file_service
-from src.core.db import get_session
+from src.api.deps import Pagination, get_file_service, get_pagination
 from src.domain.models import StoredFile
 from src.schemas.files import FileItem, FileUpdate
 from src.services.files import FileService
@@ -14,11 +12,10 @@ router = APIRouter(tags=["files"])
 
 @router.get("/files", response_model=list[FileItem])
 async def list_files(
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    pagination: Pagination = Depends(get_pagination),
     service: FileService = Depends(get_file_service),
 ) -> list[StoredFile]:
-    return await service.list(limit=limit, offset=offset)
+    return await service.list(limit=pagination.limit, offset=pagination.offset)
 
 
 @router.post("/files", response_model=FileItem, status_code=201)
@@ -27,14 +24,11 @@ async def create_file(
     title: str = Form(...),
     file: UploadFile = File(...),
     service: FileService = Depends(get_file_service),
-    session: AsyncSession = Depends(get_session),
 ) -> StoredFile:
+    # FileService.create сам коммитит (unit of work — см. src/services/files.py),
+    # поэтому к моменту возврата запись уже видна снаружи, и process_file
+    # можно смело ставить в очередь.
     item = await service.create(title=title, upload_file=file)
-    # get_session больше не коммитит сам (см. src/core/db.py) — коммит здесь
-    # обязателен: без него ничего не попадёт в БД, а server_default-поля
-    # (created_at, updated_at, requires_attention) не заполнены на момент
-    # сериализации ответа, и воркер не увидит строку.
-    await session.commit()
     background.add_task(process_file.delay, item.id)
     return item
 
@@ -49,20 +43,9 @@ async def update_file(
     file_id: str,
     payload: FileUpdate,
     service: FileService = Depends(get_file_service),
-    session: AsyncSession = Depends(get_session),
 ) -> StoredFile:
-    item = await service.rename(file_id=file_id, title=payload.title)
-    # Тот же приём, что и в create_file/delete_file: get_session больше не
-    # коммитит в фазе очистки, поэтому маршрут обязан сделать это сам, до
-    # возврата ответа — иначе следующий быстрый GET может обогнать запись.
-    await session.commit()
-    # updated_at считается на стороне БД (onupdate=func.now()), и после
-    # UPDATE SQLAlchemy помечает это поле как требующее перечитывания даже
-    # при expire_on_commit=False. Без явного refresh сериализация ответа
-    # (она идёт вне async-контекста) падает с MissingGreenlet при попытке
-    # лениво подгрузить значение.
-    await session.refresh(item)
-    return item
+    # FileService.rename сам коммитит и делает refresh (см. src/services/files.py).
+    return await service.rename(file_id=file_id, title=payload.title)
 
 
 @router.get("/files/{file_id}/download")
@@ -77,10 +60,6 @@ async def download_file(
 async def delete_file(
     file_id: str,
     service: FileService = Depends(get_file_service),
-    session: AsyncSession = Depends(get_session),
 ) -> None:
+    # FileService.remove сам коммитит (см. src/services/files.py).
     await service.remove(file_id)
-    # get_session больше не коммитит сам (см. src/core/db.py) — коммит здесь
-    # обязателен, иначе удаление откатится при закрытии сессии и клиент
-    # получит 204, хотя запись осталась на месте.
-    await session.commit()
