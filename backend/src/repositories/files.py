@@ -27,12 +27,15 @@ class FileRepository:
     # ругается "Function is not valid as a type". Порядок объявления здесь важен.
     async def list_stale(
         self, older_than: datetime, statuses: list[ProcessingStatus], limit: int = 100
-    ) -> list[StoredFile]:
+    ) -> list[str]:
         # order_by(updated_at) + limit: без него один и тот же самый старый
         # хвост зависших записей монополизировал бы выборку каждый тик, а
         # остальные никогда бы не подобрались.
+        # Реконсилятору нужны только id — select(StoredFile) тянул бы целые
+        # строки (width=266) ради одного поля (width=45) на запросе, который
+        # крутится каждые 60 секунд вечно.
         result = await self._session.execute(
-            select(StoredFile)
+            select(StoredFile.id)
             .where(
                 StoredFile.processing_status.in_([s.value for s in statuses]),
                 StoredFile.updated_at < older_than,

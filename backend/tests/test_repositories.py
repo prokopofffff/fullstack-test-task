@@ -75,7 +75,7 @@ async def test_list_stale_finds_only_old_non_terminal_rows():
             older_than=datetime.now(UTC) + timedelta(minutes=1),
             statuses=[ProcessingStatus.UPLOADED, ProcessingStatus.PROCESSING],
         )
-        ids = {row.id for row in stale}
+        ids = set(stale)
         assert fresh.id in ids
         assert done.id not in ids
 

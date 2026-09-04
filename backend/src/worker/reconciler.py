@@ -14,8 +14,7 @@ async def _reconcile() -> int:
     cutoff = datetime.now(UTC) - timedelta(seconds=settings.stale_after_seconds)
     async with async_session_maker() as session:
         repo = FileRepository(session)
-        stale = await repo.list_stale(cutoff, STUCK_STATUSES, limit=settings.reconcile_batch_size)
-        ids = [item.id for item in stale]
+        ids = await repo.list_stale(cutoff, STUCK_STATUSES, limit=settings.reconcile_batch_size)
         # Сдвигаем updated_at до диспатча: иначе запись, не успевшая
         # обработаться за один RECONCILE_INTERVAL_SECONDS, снова попадёт в
         # list_stale на следующем тике и переотправится второй раз, третий
